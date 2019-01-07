@@ -5,7 +5,7 @@ import numpy as np
 from annoy import AnnoyIndex
 
 class FaceRetrieval:
-    def __init__(self,model_dir,gpu_id=0):
+    def __init__(self, model_dir, retrieval_model_path=None, gpu_id=0):
         deploy_file = os.path.join(model_dir,"faceretrieval/resnet50_ft.prototxt")
         assert os.path.exists(deploy_file)
 
@@ -15,8 +15,6 @@ class FaceRetrieval:
         xml_file = os.path.join(model_dir,"faceretrieval/config95-V.xml")
         assert os.path.exists(xml_file)
 
-        self.__model_dir = model_dir
-
         fs = cv2.FileStorage(xml_file,cv2.FILE_STORAGE_READ)
         self.__pca_mean = fs.getNode("mean").mat()
         self.__pca_eigen_vector = fs.getNode("eigen_vector").mat()
@@ -25,14 +23,10 @@ class FaceRetrieval:
         mean_value = [91.4953,103.8827, 131.0912]
         self.__extracter = ObjTypeClassifier(deploy_file,weights_file,meanvalue=mean_value)
 
-        self.__database = AnnoyIndex(self.__feature_len)
-        database_file = os.path.join(model_dir,"faceretrieval/database.tree")
-        if os.path.exists(database_file):
-            self.__database.load(database_file)
-
-        self.__retrieval_pic_dir = os.path.join(model_dir,"faceretrieval/pic")
-        if not os.path.exists(self.__retrieval_pic_dir):
-            os.mkdir(self.__retrieval_pic_dir)
+        if retrieval_model_path:
+            assert (os.path.exists(retrieval_model_path))
+            self.__database = AnnoyIndex(self.__feature_len)
+            self.__database.load(retrieval_model_path)
 
     def extractFeature(self,im):
         try:
@@ -48,7 +42,7 @@ class FaceRetrieval:
         except:
             return []
 
-    def buildRetrievalDatabase(self,features):
+    def buildRetrievalDatabase(self,features,retrieval_model_path):
         self.__database = AnnoyIndex(self.__feature_len)
         index = 0
         for feature in features:
@@ -56,7 +50,7 @@ class FaceRetrieval:
             index += 1
 
         self.__database.build(2*self.__feature_len)
-        self.__database.save(os.path.join(self.__model_dir,"faceretrieval/database.tree"))
+        self.__database.save(retrieval_model_path)
 
     def query(self,im, k):
         feature = self.extractFeature(im)
@@ -82,11 +76,11 @@ def buildRetrievalDatabase():
         index += 1
         print "processed***************%s/%s"%(index,num)
 
-    net.buildRetrievalDatabase(features)
+    net.buildRetrievalDatabase(features,"./123.tree")
 
 def query():
     model_dir = "/home/zqp/install_lib/models"
-    net = FaceRetrieval(model_dir)
+    net = FaceRetrieval(model_dir,"./123.tree")
 
     pic_dir = "/home/zqp/github/DllFaceDeepFeature/testimage"
     for pic_name in os.listdir(pic_dir):
@@ -97,7 +91,6 @@ def query():
 
 
 if __name__=="__main__":
-
     # buildRetrievalDatabase()
     query()
 
